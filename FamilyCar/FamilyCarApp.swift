@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct FamilyCarApp: App {
@@ -13,5 +14,6 @@ struct FamilyCarApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [CarProfile.self, CarDocument.self])
     }
 }
