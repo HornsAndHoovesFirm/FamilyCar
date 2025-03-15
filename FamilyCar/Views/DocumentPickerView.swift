@@ -7,7 +7,7 @@
 
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
+//import UniformTypeIdentifiers
 import QuickLook
 
 struct DocumentPickerView: View {
@@ -16,10 +16,13 @@ struct DocumentPickerView: View {
     
     @Bindable var car: CarProfile
     @State private var showDocumentPicker = false
-    @State private var selectedDocumentURL: URL?
+//    @State private var selectedDocumentURL: URL?
     @State private var documentPreviewURL: URL?
     @State private var showPreview = false
     
+    // Reference to DocumentManager for handling document operations
+    @StateObject private var documentManager = DocumentManager()
+
     var body: some View {
         List {
             Section("Current Document") {
@@ -32,19 +35,14 @@ struct DocumentPickerView: View {
                     }
                     
                     Button("View Document") {
-                        // Create a temporary file to preview
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(document.fileName)
-                        try? document.documentData.write(to: tempURL)
-                        documentPreviewURL = tempURL
+                        documentPreviewURL = documentManager.createTemporaryFileForPreview(
+                            document: document
+                        )
                         showPreview = true
                     }
                     
                     Button("Delete Document", role: .destructive) {
-                        if let doc = car.licenseDocument {
-                            modelContext.delete(doc)
-                            car.licenseDocument = nil
-                            try? modelContext.save()
-                        }
+                        documentManager.deleteDocument(from: car, in: modelContext)
                     }
                 } else {
                     Text("No document attached")
@@ -58,76 +56,13 @@ struct DocumentPickerView: View {
         }
         .navigationTitle("Car Documents")
         .sheet(isPresented: $showDocumentPicker) {
-            DocumentPicker(selectedURL: $selectedDocumentURL)
-        }
-        .onChange(of: selectedDocumentURL) { _, newURL in
-            if let url = newURL {
-                loadDocument(from: url)
-            }
+            DocumentPickerRepresentable(
+                onDocumentPicked: { url in
+                    documentManager.loadDocument(from: url, for: car, in: modelContext)
+                }
+            )
         }
         .quickLookPreview($documentPreviewURL)
-    }
-    
-    private func loadDocument(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else {
-            return
-        }
-        
-        defer {
-            url.stopAccessingSecurityScopedResource()
-        }
-        
-        do {
-            let documentData = try Data(contentsOf: url)
-            let fileName = url.lastPathComponent
-            
-            // Delete existing document if there is one
-            if let existingDocument = car.licenseDocument {
-                modelContext.delete(existingDocument)
-            }
-            
-            // Create new document
-            let newDocument = CarDocument(
-                fileName: fileName,
-                documentData: documentData
-            )
-            
-            car.licenseDocument = newDocument
-            try modelContext.save()
-            
-        } catch {
-            print("Error loading document: \(error)")
-        }
-    }
-}
-
-struct DocumentPicker: UIViewControllerRepresentable {
-    @Binding var selectedURL: URL?
-    
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.pdf])
-        picker.delegate = context.coordinator
-        picker.allowsMultipleSelection = false
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let parent: DocumentPicker
-        
-        init(_ parent: DocumentPicker) {
-            self.parent = parent
-        }
-        
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            guard let url = urls.first else { return }
-            parent.selectedURL = url
-        }
     }
 }
 
