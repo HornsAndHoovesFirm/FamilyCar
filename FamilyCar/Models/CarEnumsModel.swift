@@ -6,9 +6,10 @@
 //
 
 import Foundation
+import SwiftData
 
 // Enum for fuel types
-enum FuelType: String, Codable {
+enum FuelType: String, Codable, CaseIterable {
     case gasoline
     case diesel
     case electric
@@ -16,9 +17,13 @@ enum FuelType: String, Codable {
 }
 
 // Enum for transmission types
-enum TransmissionType: String, Codable {
+enum TransmissionType: String, Codable, CaseIterable {
     case manual
     case automatic
     case semiAutomatic
     case cvt
 }
+
+// Add extensions to make these enums persistent with SwiftData
+extension FuelType: Hashable {}
+extension TransmissionType: Hashable {}
