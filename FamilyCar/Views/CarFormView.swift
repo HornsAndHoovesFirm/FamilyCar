@@ -205,7 +205,30 @@ struct CarFormView: View {
     }
 }
 
+//#Preview {
+//    CarFormView(car: CarProfile.sampleCars()[0])
+//        .modelContainer(ModelContainer.previewContainer())
+//}
+
 #Preview {
-    CarFormView(car: CarProfile.sampleCars()[0])
-        .modelContainer(ModelContainer.previewContainer())
+    NavigationStack {
+        Form {
+            Section(header: Text("Basic Information")) {
+                Text("Make: Toyota")
+                Text("Model: Camry")
+                Text("Year: 2022")
+                Text("License Plate: ABC123")
+                Text("Nickname: Family Sedan")
+                Text("Color: Blue")
+            }
+            
+            Section(header: Text("Technical Details")) {
+                Text("VIN: 1HGCM82633A123456")
+                Text("Fuel Type: Gasoline")
+                Text("Engine Size: 2.5L")
+                Text("Transmission: Automatic")
+            }
+        }
+        .navigationTitle("Add Car")
+    }
 }

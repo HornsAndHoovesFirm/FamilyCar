@@ -47,7 +47,11 @@ struct CarListView: View {
     }
 }
 
+//#Preview {
+//    CarListView()
+//        .modelContainer(ModelContainer.previewContainer())
+//}
+
 #Preview {
-    CarListView()
-        .modelContainer(ModelContainer.previewContainer())
+    CarListPreview()
 }

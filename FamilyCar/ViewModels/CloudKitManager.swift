@@ -32,6 +32,20 @@ class CloudKitManager: ObservableObject {
     
     /// Check if the user is signed into iCloud
     func checkUserStatus() {
+        // Skip real iCloud check in previews
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            // Set preview data directly
+            self.isSignedIn = true
+            self.userName = "Preview User"
+            self.userID = "preview-user-id"
+            self.familyMembers = FamilyMember.sampleMembers()
+            self.error = nil
+            self.isLoading = false
+            return // Skip the actual iCloud check
+        }
+        #endif
+        
         isLoading = true
         
         container.accountStatus { [weak self] status, error in

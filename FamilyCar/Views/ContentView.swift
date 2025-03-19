@@ -181,7 +181,52 @@ struct SettingsView: View {
     }
 }
 
+//#Preview {
+//    ContentView()
+//        .environmentObject(CloudKitManager())
+//}
+
 #Preview {
-    ContentView()
-        .environmentObject(CloudKitManager())
+    TabView {
+        CarListPreview()
+            .tabItem {
+                Label("Cars", systemImage: "car.fill")
+            }
+        
+        NavigationStack {
+            FamilyMembersPreview()
+        }
+        .tabItem {
+            Label("Family", systemImage: "person.3.fill")
+        }
+        
+        NavigationStack {
+            List {
+                Section(header: Text("iCloud Account")) {
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading) {
+                            Text("Preview User")
+                                .font(.headline)
+                            Text("Signed in with iCloud")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                Section(header: Text("About")) {
+                    LabeledContent("App Version", value: "1.0.0")
+                    LabeledContent("Database", value: "CloudKit")
+                }
+            }
+            .navigationTitle("Settings")
+        }
+        .tabItem {
+            Label("Settings", systemImage: "gear")
+        }
+    }
 }

@@ -101,6 +101,47 @@ struct CloudKitSignInView: View {
 }
 
 #Preview {
-    CloudKitSignInView()
-        .environmentObject(CloudKitManager())
+    VStack(spacing: 20) {
+        Image(systemName: "car.2.fill")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 100, height: 100)
+            .foregroundColor(.blue)
+        
+        Text("Family Car Usage App")
+            .font(.largeTitle)
+            .bold()
+        
+        Text("Keep track of your family's vehicles together")
+            .font(.headline)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+        
+        Spacer()
+        
+        VStack(spacing: 15) {
+            Text("To sync your car data across family devices, please sign in to iCloud")
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button(action: {}) {
+                HStack {
+                    Image(systemName: "icloud.fill")
+                    Text("Sign in with iCloud")
+                }
+                .frame(minWidth: 200)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+        }
+        
+        Spacer()
+        
+        Text("Version 1.0.0")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+    }
+    .padding()
 }

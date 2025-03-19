@@ -69,9 +69,15 @@ struct CarDetailView: View {
     }
 }
 
+//#Preview {
+//    NavigationStack {
+//        CarDetailView(car: CarProfile.sampleCarWithDocument())
+//    }
+//    .modelContainer(ModelContainer.previewContainer())
+//}
+
 #Preview {
     NavigationStack {
-        CarDetailView(car: CarProfile.sampleCarWithDocument())
+        CarDetailPreview()
     }
-    .modelContainer(ModelContainer.previewContainer())
 }

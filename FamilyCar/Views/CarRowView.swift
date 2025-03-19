@@ -30,8 +30,12 @@ struct CarRowView: View {
         .padding(.vertical, 5)
     }
 }
-#Preview {
-    CarRowView(car: CarProfile.sampleCars()[0])
-        .modelContainer(ModelContainer.previewContainer())
 
+//#Preview {
+//    CarRowView(car: CarProfile.sampleCars()[0])
+//        .modelContainer(ModelContainer.previewContainer())
+//}
+
+#Preview {
+    CarRowPreview()
 }

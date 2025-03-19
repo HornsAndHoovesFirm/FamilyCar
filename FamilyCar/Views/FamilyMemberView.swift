@@ -270,9 +270,15 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+//#Preview {
+//    NavigationStack {
+//        FamilyMembersView()
+//            .environmentObject(CloudKitManager())
+//    }
+//}
+
 #Preview {
     NavigationStack {
-        FamilyMembersView()
-            .environmentObject(CloudKitManager())
+        FamilyMembersPreview()
     }
 }

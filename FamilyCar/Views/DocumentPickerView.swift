@@ -66,9 +66,15 @@ struct DocumentPickerView: View {
     }
 }
 
+//#Preview {
+//    NavigationStack {
+//        DocumentPickerView(car: CarProfile.sampleCarWithDocument())
+//    }
+//    .modelContainer(ModelContainer.previewContainer())
+//}
+
 #Preview {
     NavigationStack {
-        DocumentPickerView(car: CarProfile.sampleCarWithDocument())
+        DocumentPickerPreview()
     }
-    .modelContainer(ModelContainer.previewContainer())
 }
