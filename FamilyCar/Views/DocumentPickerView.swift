@@ -7,7 +7,7 @@
 
 import SwiftUI
 import SwiftData
-//import UniformTypeIdentifiers
+import UniformTypeIdentifiers
 import QuickLook
 
 struct DocumentPickerView: View {
@@ -16,9 +16,10 @@ struct DocumentPickerView: View {
     
     @Bindable var car: CarProfile
     @State private var showDocumentPicker = false
-//    @State private var selectedDocumentURL: URL?
     @State private var documentPreviewURL: URL?
     @State private var showPreview = false
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     // Reference to DocumentManager for handling document operations
     @StateObject private var documentManager = DocumentManager()
@@ -27,52 +28,114 @@ struct DocumentPickerView: View {
         List {
             Section("Current Document") {
                 if let document = car.licenseDocument {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(document.fileName)
                             .font(.headline)
-                        Text("Uploaded: \(document.uploadDate.formatted())")
+                        Text("Uploaded: \(document.uploadDate.formatted(date: .long, time: .shortened))")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding(.vertical, 4)
                     
-                    Button("View Document") {
+                    Button {
                         documentPreviewURL = documentManager.createTemporaryFileForPreview(
                             document: document
                         )
-                        showPreview = true
+                        if documentPreviewURL != nil {
+                            showPreview = true
+                        } else {
+                            alertMessage = "Could not create preview file for the document."
+                            showAlert = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "eye")
+                            Text("View Document")
+                        }
                     }
                     
-                    Button("Delete Document", role: .destructive) {
+                    Button(role: .destructive) {
                         documentManager.deleteDocument(from: car, in: modelContext)
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("Delete Document")
+                        }
                     }
                 } else {
-                    Text("No document attached")
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Image(systemName: "doc.fill.badge.plus")
+                            .foregroundColor(.secondary)
+                        Text("No document attached")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
                 }
             }
             
-            Button("Select Document") {
-                showDocumentPicker = true
+            Section {
+                Button {
+                    showDocumentPicker = true
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.badge.plus")
+                        Text(car.licenseDocument == nil ? "Add Document" : "Replace Document")
+                    }
+                }
             }
         }
         .navigationTitle("Car Documents")
         .sheet(isPresented: $showDocumentPicker) {
-            DocumentPickerRepresentable(
-                onDocumentPicked: { url in
-                    documentManager.loadDocument(from: url, for: car, in: modelContext)
+            DocumentPickerRepresentable { url in
+                do {
+                    try documentManager.loadDocument(from: url, for: car, in: modelContext)
+                } catch {
+                    alertMessage = "Error loading document: \(error.localizedDescription)"
+                    showAlert = true
                 }
-            )
+            }
         }
         .quickLookPreview($documentPreviewURL)
+        .alert("Document Error", isPresented: $showAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
     }
 }
 
-//#Preview {
-//    NavigationStack {
-//        DocumentPickerView(car: CarProfile.sampleCarWithDocument())
-//    }
-//    .modelContainer(ModelContainer.previewContainer())
-//}
+// UIViewControllerRepresentable for document picker
+struct DocumentPickerRepresentable: UIViewControllerRepresentable {
+    var onDocumentPicked: (URL) -> Void
+    
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.pdf])
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: DocumentPickerRepresentable
+        
+        init(_ parent: DocumentPickerRepresentable) {
+            self.parent = parent
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+            parent.onDocumentPicked(url)
+        }
+    }
+}
 
+// Preview
 #Preview {
     NavigationStack {
         DocumentPickerPreview()

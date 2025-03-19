@@ -10,7 +10,7 @@ import SwiftData
 
 struct CarListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var carProfiles: [CarProfile]
+    @Query(sort: \CarProfile.make) private var carProfiles: [CarProfile]
     @State private var showingAddCar = false
     
     var body: some View {
@@ -46,11 +46,6 @@ struct CarListView: View {
         try? modelContext.save()
     }
 }
-
-//#Preview {
-//    CarListView()
-//        .modelContainer(ModelContainer.previewContainer())
-//}
 
 #Preview {
     CarListPreview()

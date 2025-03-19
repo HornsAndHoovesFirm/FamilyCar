@@ -11,25 +11,26 @@ import SwiftData
 // Main car profile model
 @Model
 class CarProfile {
-    // Basic Information
-    var make: String
-    var model: String
-    var year: Int
-    var licensePlate: String
+    // Basic Information with default values
+    var make: String = ""
+    var model: String = ""
+    var year: Int = Calendar.current.component(.year, from: Date())
+    var licensePlate: String = ""
     var nickname: String?
-    var color: String
+    var color: String = ""
     
-    // Technical Details
-    var vin: String
-    var fuelType: FuelType
-    var engineSize: String
-    var transmissionType: TransmissionType
+    // Technical Details with default values
+    var vin: String = ""
+    var fuelType: FuelType = FuelType.gasoline
+    var engineSize: String = ""
+    var transmissionType: TransmissionType = TransmissionType.automatic
     
-    // Ownership Information
-    var purchaseDate: Date
-    var firstRoadDate: Date
+    // Ownership Information with default values
+    var purchaseDate: Date = Date()
+    var firstRoadDate: Date = Date()
     
-    // Document
+    // Document with explicit relationship declaration
+    @Relationship(deleteRule: .cascade)
     var licenseDocument: CarDocument?
     
     init(

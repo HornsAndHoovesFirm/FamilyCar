@@ -205,11 +205,6 @@ struct CarFormView: View {
     }
 }
 
-//#Preview {
-//    CarFormView(car: CarProfile.sampleCars()[0])
-//        .modelContainer(ModelContainer.previewContainer())
-//}
-
 #Preview {
     NavigationStack {
         Form {

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import CloudKit
 
 struct ContentView: View {
     @EnvironmentObject private var cloudKitManager: CloudKitManager
@@ -14,66 +15,75 @@ struct ContentView: View {
     @State private var showingSyncStatus = false
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Cars tab
-            CarListView()
-                .tabItem {
-                    Label("Cars", systemImage: "car.fill")
-                }
-                .tag(0)
-            
-            // Family tab
-            NavigationStack {
-                FamilyMembersView()
-            }
-            .tabItem {
-                Label("Family", systemImage: "person.3.fill")
-            }
-            .tag(1)
-            
-            // Settings tab
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(2)
-        }
-        .overlay(
-            // Show cloud sync status when active
-            Group {
-                if showingSyncStatus {
-                    VStack {
-                        Spacer()
-                        
-                        HStack {
-                            Image(systemName: "icloud.and.arrow.up.fill")
-                            Text("Syncing with iCloud...")
-                        }
-                        .padding()
-                        .background(Color.blue.opacity(0.2))
-                        .cornerRadius(10)
-                        .padding(.bottom, 60) // Above tab bar
+        Group {
+            if !cloudKitManager.isSignedIn {
+                // Show sign-in view if not signed in
+                CloudKitSignInView()
+            } else {
+                // Main app content
+                TabView(selection: $selectedTab) {
+                    // Cars tab
+                    NavigationStack {
+                        CarListView()
                     }
-                    .transition(.move(edge: .bottom))
+                    .tabItem {
+                        Label("Cars", systemImage: "car.fill")
+                    }
+                    .tag(0)
+                    
+                    // Family tab
+                    NavigationStack {
+                        FamilyMembersView()
+                    }
+                    .tabItem {
+                        Label("Family", systemImage: "person.3.fill")
+                    }
+                    .tag(1)
+                    
+                    // Settings tab
+                    NavigationStack {
+                        SettingsView()
+                    }
+                    .tabItem {
+                        Label("Settings", systemImage: "gear")
+                    }
+                    .tag(2)
                 }
-            }
-            .animation(.easeInOut, value: showingSyncStatus)
-        )
-        .environmentObject(cloudKitManager)
-        .onAppear {
-            // If user has no record as family member, add them automatically
-            if cloudKitManager.familyMembers.isEmpty {
-                cloudKitManager.addCurrentUserToFamily(role: "Owner")
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncStarted"))) { _ in
-            showingSyncStatus = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncCompleted"))) { _ in
-            withAnimation(.easeInOut(duration: 0.5)) {
-                showingSyncStatus = false
+                .overlay(
+                    // Show cloud sync status when active
+                    Group {
+                        if showingSyncStatus {
+                            VStack {
+                                Spacer()
+                                
+                                HStack {
+                                    Image(systemName: "icloud.and.arrow.up.fill")
+                                    Text("Syncing with iCloud...")
+                                }
+                                .padding()
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(10)
+                                .padding(.bottom, 60) // Above tab bar
+                            }
+                            .transition(.move(edge: .bottom))
+                        }
+                    }
+                    .animation(.easeInOut, value: showingSyncStatus)
+                )
+                .onAppear {
+                    // If user has no record as family member, add them automatically
+                    if cloudKitManager.familyMembers.isEmpty {
+                        cloudKitManager.addCurrentUserToFamily(role: "Owner")
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncStarted"))) { _ in
+                    showingSyncStatus = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncCompleted"))) { _ in
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showingSyncStatus = false
+                    }
+                }
             }
         }
     }
@@ -157,7 +167,7 @@ struct SettingsView: View {
             Button("Sign Out", role: .destructive) {
                 // In a real app, you would handle sign out here
                 // For now, we just check status again
-                cloudKitManager.checkUserStatus()
+                cloudKitManager.isSignedIn = false
             }
         } message: {
             Text("Are you sure you want to sign out? Your data will remain in iCloud.")
@@ -181,11 +191,7 @@ struct SettingsView: View {
     }
 }
 
-//#Preview {
-//    ContentView()
-//        .environmentObject(CloudKitManager())
-//}
-
+// Preview
 #Preview {
     TabView {
         CarListPreview()

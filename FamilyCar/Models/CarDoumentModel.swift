@@ -11,9 +11,14 @@ import SwiftData
 // Document model for storing PDF
 @Model
 class CarDocument {
-    var fileName: String
-    var documentData: Data
-    var uploadDate: Date
+    // Make properties have default values
+    var fileName: String = ""
+    var documentData: Data = Data()
+    var uploadDate: Date = Date()
+    
+    // Add the inverse relationship to CarProfile
+    @Relationship(inverse: \CarProfile.licenseDocument)
+    var car: CarProfile?
     
     init(fileName: String, documentData: Data, uploadDate: Date = Date()) {
         self.fileName = fileName

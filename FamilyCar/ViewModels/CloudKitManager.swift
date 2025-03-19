@@ -5,6 +5,13 @@
 //  Created by Oleg Chernobelsky on 17/03/2025.
 //
 
+//
+//  CloudKitManager.swift
+//  FamilyCar
+//
+//  Created by Oleg Chernobelsky on 17/03/2025.
+//
+
 import Foundation
 import CloudKit
 import SwiftUI
@@ -26,27 +33,38 @@ class CloudKitManager: ObservableObject {
     @Published var familyMembers: [FamilyMember] = []
     
     init(containerIdentifier: String = "iCloud.com.HornsAndHooves.FamilyCar") {
+        // Use a more generic container identifier that you'd replace with your actual bundle ID
         self.container = CKContainer(identifier: containerIdentifier)
+        
+        // In a production app, do an initial check
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            // Skip for previews and set some sample data
+            setupPreviewMode()
+            return
+        }
+        #endif
+        
+        // Check if the user is signed in
         checkUserStatus()
+    }
+    
+    // Setup preview mode with mock data
+    private func setupPreviewMode() {
+        self.isSignedIn = true
+        self.userName = "Preview User"
+        self.userID = "preview-user-id"
+        self.error = nil
+        self.isLoading = false
+        self.familyMembers = FamilyMember.sampleMembers()
     }
     
     /// Check if the user is signed into iCloud
     func checkUserStatus() {
-        // Skip real iCloud check in previews
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-            // Set preview data directly
-            self.isSignedIn = true
-            self.userName = "Preview User"
-            self.userID = "preview-user-id"
-            self.familyMembers = FamilyMember.sampleMembers()
-            self.error = nil
-            self.isLoading = false
-            return // Skip the actual iCloud check
-        }
-        #endif
-        
         isLoading = true
+        
+        // Reset error state
+        error = nil
         
         container.accountStatus { [weak self] status, error in
             DispatchQueue.main.async {
@@ -63,21 +81,16 @@ class CloudKitManager: ObservableObject {
                 case .available:
                     self.isSignedIn = true
                     self.fetchUserRecord()
-                case .noAccount:
+                case .noAccount, .restricted, .temporarilyUnavailable, .couldNotDetermine:
                     self.isSignedIn = false
-                    print("No iCloud account found")
-                case .restricted:
-                    self.isSignedIn = false
-                    print("iCloud account access is restricted")
-                case .temporarilyUnavailable:
-                    self.isSignedIn = false
-                    print("iCloud account is temporarily unavailable")
-                case .couldNotDetermine:
-                    self.isSignedIn = false
-                    print("Could not determine iCloud account status")
+                    self.error = NSError(domain: "CloudKitManager",
+                                        code: Int(status.rawValue),
+                                        userInfo: [NSLocalizedDescriptionKey: "iCloud account not available: \(status.rawValue)"])
                 @unknown default:
                     self.isSignedIn = false
-                    print("Unknown iCloud account status")
+                    self.error = NSError(domain: "CloudKitManager",
+                                        code: -1,
+                                        userInfo: [NSLocalizedDescriptionKey: "Unknown iCloud account status"])
                 }
             }
         }
@@ -85,30 +98,40 @@ class CloudKitManager: ObservableObject {
     
     /// Fetch the current user's record
     private func fetchUserRecord() {
+        self.isLoading = true
+        
         container.fetchUserRecordID { [weak self] recordID, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
                 if let error = error {
                     self.error = error
+                    self.isLoading = false
                     return
                 }
                 
                 if let id = recordID {
                     self.userID = id.recordName
                     self.fetchUserName(recordID: id)
+                } else {
+                    self.isLoading = false
+                    self.error = NSError(domain: "CloudKitManager",
+                                        code: -1,
+                                        userInfo: [NSLocalizedDescriptionKey: "Could not fetch user record ID"])
                 }
             }
         }
     }
     
-    /// Fetch the current user's name
+    /// Fetch the current user's name using non-deprecated methods
     private func fetchUserName(recordID: CKRecord.ID) {
-        // With the deprecation of discoverUserIdentity, we need to use a different approach
-        // Fetch the user record directly
+        // Since discoverUserIdentity is deprecated in iOS 17, we'll use a different approach
+        // We'll check if we can get the user record from the database
+        
         container.privateCloudDatabase.fetch(withRecordID: recordID) { [weak self] record, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                self.isLoading = false
                 
                 if let error = error {
                     self.error = error
@@ -116,64 +139,82 @@ class CloudKitManager: ObservableObject {
                 }
                 
                 if let record = record {
-                    // Try to get the user's name from the record
-                    // The field names might vary based on your setup
+                    // Try to extract user info from the record if available
+                    // Note: The actual field name may vary depending on your CloudKit schema
                     if let name = record["displayName"] as? String {
                         self.userName = name
+                    } else if let firstName = record["firstName"] as? String,
+                             let lastName = record["lastName"] as? String {
+                        self.userName = "\(firstName) \(lastName)"
                     } else {
-                        // If no name is available, use a generic name
+                        // Default name if no user info is available
                         self.userName = "Family Member"
                     }
-                    
-                    // Now that we have user info, fetch family members
-                    self.fetchFamilyMembers()
+                } else {
+                    self.userName = "Family Member"
                 }
+                
+                // Now that we have user info, fetch family members
+                self.fetchFamilyMembers()
             }
         }
     }
     
     /// Fetch family members from CloudKit
     func fetchFamilyMembers() {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            return // Skip for previews since we've already set up sample data
+        }
+        #endif
+        
         isLoading = true
         
         // Create a query for family members
         let query = CKQuery(recordType: "FamilyMember", predicate: NSPredicate(value: true))
         
-        // Use the newer API instead of the deprecated perform method
-        container.privateCloudDatabase.fetch(
-            withQuery: query,
-            inZoneWith: nil,
-            desiredKeys: nil,
-            resultsLimit: CKQueryOperation.maximumResults
-        ) { [weak self] result in
+        // Query operation
+        let operation = CKQueryOperation(query: query)
+        
+        var fetchedMembers: [FamilyMember] = []
+        
+        // Configure the operation
+        operation.recordMatchedBlock = { (recordID, result) in
+            switch result {
+            case .success(let record):
+                let name = record["name"] as? String ?? "Unknown"
+                let role = record["role"] as? String ?? "Member"
+                let deviceID = record["deviceID"] as? String ?? ""
+                
+                let member = FamilyMember(
+                    id: record.recordID.recordName,
+                    name: name,
+                    role: role,
+                    deviceID: deviceID
+                )
+                fetchedMembers.append(member)
+                
+            case .failure(let error):
+                print("Error fetching record: \(error)")
+            }
+        }
+        
+        operation.queryResultBlock = { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
                 
                 switch result {
-                case .success(let (matchResults, _)):
-                    self.familyMembers = matchResults.compactMap { (recordID, result) -> FamilyMember? in
-                        switch result {
-                        case .success(let record):
-                            let name = record["name"] as? String ?? "Unknown"
-                            let role = record["role"] as? String ?? "Member"
-                            let deviceID = record["deviceID"] as? String ?? ""
-                            
-                            return FamilyMember(
-                                id: record.recordID.recordName,
-                                name: name,
-                                role: role,
-                                deviceID: deviceID
-                            )
-                        case .failure:
-                            return nil
-                        }
-                    }
+                case .success(_):
+                    self.familyMembers = fetchedMembers
                 case .failure(let error):
                     self.error = error
                 }
             }
         }
+        
+        // Add the operation to the database
+        container.privateCloudDatabase.add(operation)
     }
     
     /// Add current user as a family member if not already added
@@ -191,6 +232,7 @@ class CloudKitManager: ObservableObject {
         record["name"] = userName as CKRecordValue
         record["role"] = role as CKRecordValue
         record["deviceID"] = userID as CKRecordValue
+        record["dateAdded"] = Date() as CKRecordValue
         
         container.privateCloudDatabase.save(record) { [weak self] savedRecord, error in
             DispatchQueue.main.async {
@@ -207,7 +249,9 @@ class CloudKitManager: ObservableObject {
                         id: record.recordID.recordName,
                         name: self.userName,
                         role: role,
-                        deviceID: self.userID
+                        deviceID: self.userID,
+                        isActive: true,
+                        dateAdded: Date()
                     )
                     self.familyMembers.append(member)
                 }
@@ -215,17 +259,24 @@ class CloudKitManager: ObservableObject {
         }
     }
     
-    /// Share a CloudKit zone with family members
-    func shareWithFamily(familyMemberIDs: [String], completion: @escaping (Bool) -> Void) {
-        // Implementation will depend on your specific sharing requirements
-        // This is a placeholder for the sharing functionality
+    /// Remove a family member
+    func removeFamilyMember(id: String) {
+        // Find the member to remove
+        guard let index = familyMembers.firstIndex(where: { $0.id == id }) else { return }
         
-        // You would create a CKShare, add permissions, and save it
-        // Then share the URL with family members
+        // Remove from local array
+        let member = familyMembers.remove(at: index)
         
-        // Simplified implementation for now
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            completion(true)
+        // Remove from CloudKit
+        let recordID = CKRecord.ID(recordName: id)
+        container.privateCloudDatabase.delete(withRecordID: recordID) { [weak self] (_, error) in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error removing family member: \(error)")
+                    // Add back to array if delete failed
+                    self?.familyMembers.append(member)
+                }
+            }
         }
     }
 }

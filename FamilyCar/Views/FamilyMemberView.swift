@@ -5,6 +5,13 @@
 //  Created by Oleg Chernobelsky on 18/03/2025.
 //
 
+//
+//  FamilyMembersView.swift
+//  FamilyCar
+//
+//  Created by Oleg Chernobelsky on 18/03/2025.
+//
+
 import SwiftUI
 import CloudKit
 
@@ -63,7 +70,7 @@ struct FamilyMembersView: View {
                         ProgressView("Loading members...")
                         Spacer()
                     }
-                } else if cloudKitManager.familyMembers.isEmpty {
+                } else if cloudKitManager.familyMembers.filter({ $0.deviceID != cloudKitManager.userID }).isEmpty {
                     Text("No family members added yet")
                         .foregroundColor(.secondary)
                         .italic()
@@ -205,7 +212,7 @@ struct FamilyMembersView: View {
             presenting: selectedMember
         ) { member in
             Button("View Details") {
-                // View member details (could navigate to detail view)
+                // View member details (could navigate to detail view in future)
                 print("View details for \(member.name)")
             }
             
@@ -215,8 +222,7 @@ struct FamilyMembersView: View {
                role.permissions.canRemoveMembers {
                 
                 Button("Remove from Family", role: .destructive) {
-                    // Remove member logic would go here
-                    print("Remove \(member.name) from family")
+                    cloudKitManager.removeFamilyMember(id: member.id)
                 }
             }
             
@@ -270,13 +276,7 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-//#Preview {
-//    NavigationStack {
-//        FamilyMembersView()
-//            .environmentObject(CloudKitManager())
-//    }
-//}
-
+// Preview
 #Preview {
     NavigationStack {
         FamilyMembersPreview()
