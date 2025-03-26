@@ -12,9 +12,12 @@ import CloudKit
 
 @main
 struct FamilyCarApp: App {
+    // CloudKit container identifier constant
+    static let containerIdentifier = "iCloud.com.HornsAndHooves.FamilyCar"
+    
     // CloudKit manager instance as an environment object
     @StateObject private var cloudKitManager = CloudKitManager(
-        containerIdentifier: "iCloud.com.HornsAndHooves.FamilyCar"
+        containerIdentifier: containerIdentifier
     )
     
     var body: some Scene {

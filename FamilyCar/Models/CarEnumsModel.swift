@@ -22,8 +22,38 @@ enum TransmissionType: String, Codable, CaseIterable {
     case automatic
     case semiAutomatic
     case cvt
+    
+    // Display name for better UI presentation
+    var displayName: String {
+        switch self {
+        case .manual:
+            return "Manual"
+        case .automatic:
+            return "Automatic"
+        case .semiAutomatic:
+            return "Semi-Automatic"
+        case .cvt:
+            return "CVT (Continuously Variable)"
+        }
+    }
 }
 
 // Add extensions to make these enums persistent with SwiftData
 extension FuelType: Hashable {}
 extension TransmissionType: Hashable {}
+
+// Extension for FuelType to provide friendly icons
+extension FuelType {
+    var iconName: String {
+        switch self {
+        case .electric:
+            return "bolt.car.fill"
+        case .hybrid:
+            return "leaf.arrow.circlepath"
+        case .diesel:
+            return "fuelpump.fill"
+        case .gasoline:
+            return "car.fill"
+        }
+    }
+}

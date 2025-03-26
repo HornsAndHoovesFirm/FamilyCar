@@ -1,15 +1,9 @@
 //
-//  FamilyMemberView.swift
-//  FamilyCar
-//
-//  Created by Oleg Chernobelsky on 18/03/2025.
-//
-
-//
 //  FamilyMembersView.swift
 //  FamilyCar
 //
 //  Created by Oleg Chernobelsky on 18/03/2025.
+//  Updated to fix Family Member registration on 23/03/2025.
 //
 
 import SwiftUI
@@ -25,8 +19,18 @@ struct FamilyMembersView: View {
     @State private var shareURL: URL?
     @State private var selectedMember: FamilyMember?
     @State private var showingMemberOptions = false
+    @State private var showingAddSelfAlert = false
+    @State private var registeringAsSelf = false
+    
+    // Error handling
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     let roles = ["Owner", "Admin", "Member", "Viewer"]
+    
+    var isCurrentUserMember: Bool {
+        cloudKitManager.familyMembers.contains { $0.deviceID == cloudKitManager.userID }
+    }
     
     var body: some View {
         List {
@@ -54,11 +58,22 @@ struct FamilyMembersView: View {
                     
                     Spacer()
                     
-                    Text("You")
+                    if isCurrentUserMember {
+                        Text("You")
+                            .font(.caption)
+                            .padding(5)
+                            .background(Color.blue.opacity(0.2))
+                            .cornerRadius(5)
+                    } else {
+                        Button("Register") {
+                            showingAddSelfAlert = true
+                        }
                         .font(.caption)
                         .padding(5)
-                        .background(Color.blue.opacity(0.2))
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundColor(.orange)
                         .cornerRadius(5)
+                    }
                 }
             }
             
@@ -116,12 +131,12 @@ struct FamilyMembersView: View {
                     Label("Invite Family Member", systemImage: "person.badge.plus")
                 }
                 
-                if !cloudKitManager.familyMembers.contains(where: { $0.deviceID == cloudKitManager.userID }) {
+                if !isCurrentUserMember {
                     Button(action: {
-                        // Add the current user as a family member if not already added
-                        cloudKitManager.addCurrentUserToFamily(role: "Owner")
+                        showingAddSelfAlert = true
                     }) {
-                        Label("Add Yourself as Owner", systemImage: "person.fill.checkmark")
+                        Label("Register as Family Owner", systemImage: "person.fill.checkmark")
+                            .foregroundColor(.blue)
                     }
                 }
                 
@@ -131,11 +146,49 @@ struct FamilyMembersView: View {
                     Label("Refresh Member List", systemImage: "arrow.clockwise")
                 }
             }
+            
+            // Manual registration section if not already a member
+            if !isCurrentUserMember {
+                Section(header: Text("Manual Registration")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("You need to register yourself as a family member to use all features.")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                        
+                        Button(action: {
+                            registeringAsSelf = true
+                            registerSelfAsOwner()
+                        }) {
+                            if registeringAsSelf {
+                                HStack {
+                                    ProgressView()
+                                        .padding(.trailing, 5)
+                                    Text("Registering...")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue.opacity(0.7))
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                            } else {
+                                Text("Register Myself as Owner")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                            }
+                        }
+                        .disabled(registeringAsSelf)
+                    }
+                    .padding(.vertical, 5)
+                }
+            }
         }
         .navigationTitle("Family Members")
         .overlay(
             Group {
-                if cloudKitManager.isLoading {
+                if cloudKitManager.isLoading && !registeringAsSelf {
                     ProgressView()
                         .scaleEffect(1.5)
                         .padding()
@@ -230,6 +283,19 @@ struct FamilyMembersView: View {
         } message: { member in
             Text("Select an action for \(member.name)")
         }
+        .alert("Register as Family Owner", isPresented: $showingAddSelfAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Register", role: .none) {
+                registerSelfAsOwner()
+            }
+        } message: {
+            Text("This will register you as the Family Owner with full access to all app features. Continue?")
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
         .onAppear {
             cloudKitManager.fetchFamilyMembers()
         }
@@ -238,8 +304,46 @@ struct FamilyMembersView: View {
         }
     }
     
+    // Function to register self as owner
+    private func registerSelfAsOwner() {
+        registeringAsSelf = true
+        
+        // Ensure we have a user ID
+        guard !cloudKitManager.userID.isEmpty else {
+            registeringAsSelf = false
+            errorMessage = "Unable to register: No user ID available. Please check your iCloud status in Settings."
+            showError = true
+            return
+        }
+        
+        // Add self as owner
+        cloudKitManager.addCurrentUserToFamily(role: "Owner")
+        
+        // Delay to allow operation to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            registeringAsSelf = false
+            
+            // Check if registration was successful
+            if cloudKitManager.familyMembers.contains(where: { $0.deviceID == cloudKitManager.userID }) {
+                // Success - no need to do anything as UI will update
+            } else {
+                // Show error if still not registered
+                errorMessage = "Registration failed. Please try again or check the Settings tab for additional options."
+                showError = true
+            }
+        }
+    }
+    
     func inviteFamilyMember() {
         isInviting = true
+        
+        // First check if current user is a member
+        if !isCurrentUserMember {
+            isInviting = false
+            errorMessage = "You need to register yourself as a family member before inviting others."
+            showError = true
+            return
+        }
         
         // Generate a unique invitation code
         let inviteCode = UUID().uuidString
@@ -279,6 +383,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 // Preview
 #Preview {
     NavigationStack {
-        FamilyMembersPreview()
+        FamilyMembersView()
+            .environmentObject(DirectPreviewSamples.cloudKitManager)
     }
 }

@@ -20,6 +20,7 @@ struct DocumentPickerView: View {
     @State private var showPreview = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var alertTitle = ""
     
     // Reference to DocumentManager for handling document operations
     @StateObject private var documentManager = DocumentManager()
@@ -38,12 +39,11 @@ struct DocumentPickerView: View {
                     .padding(.vertical, 4)
                     
                     Button {
-                        documentPreviewURL = documentManager.createTemporaryFileForPreview(
-                            document: document
-                        )
-                        if documentPreviewURL != nil {
+                        if let tempURL = documentManager.createTemporaryFileForPreview(document: document) {
+                            documentPreviewURL = tempURL
                             showPreview = true
                         } else {
+                            alertTitle = "Preview Error"
                             alertMessage = "Could not create preview file for the document."
                             showAlert = true
                         }
@@ -89,17 +89,29 @@ struct DocumentPickerView: View {
             DocumentPickerRepresentable { url in
                 do {
                     try documentManager.loadDocument(from: url, for: car, in: modelContext)
+                } catch let error as DocumentManagerError {
+                    alertTitle = "Document Error"
+                    alertMessage = error.errorDescription ?? "Unknown error occurred."
+                    showAlert = true
                 } catch {
+                    alertTitle = "Document Error"
                     alertMessage = "Error loading document: \(error.localizedDescription)"
                     showAlert = true
                 }
             }
         }
         .quickLookPreview($documentPreviewURL)
-        .alert("Document Error", isPresented: $showAlert) {
+        .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .onDisappear {
+            // Clean up any temporary files when view disappears
+            if let url = documentPreviewURL {
+                try? FileManager.default.removeItem(at: url)
+                documentPreviewURL = nil
+            }
         }
     }
 }

@@ -5,13 +5,6 @@
 //  Created by Oleg Chernobelsky on 15/03/2025.
 //
 
-//
-//  DocumentManager.swift
-//  FamilyCar
-//
-//  Created by Oleg Chernobelsky on 15/03/2025.
-//
-
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
@@ -23,6 +16,7 @@ enum DocumentManagerError: Error, LocalizedError {
     case invalidFileType
     case saveError
     case createTempFileError
+    case fileTooLarge(Int)
     
     var errorDescription: String? {
         switch self {
@@ -36,16 +30,24 @@ enum DocumentManagerError: Error, LocalizedError {
             return "Failed to save the document to the database."
         case .createTempFileError:
             return "Failed to create a temporary file for preview."
+        case .fileTooLarge(let size):
+            let sizeInMB = Double(size) / 1_048_576.0
+            return "File size (\(String(format: "%.1f", sizeInMB)) MB) exceeds the maximum allowed size of 10 MB."
         }
     }
 }
 
 // MARK: - Document Manager
 class DocumentManager: ObservableObject {
+    // Maximum file size (10 MB)
+    private let maxFileSize = 10 * 1_048_576
     
     /// Creates a temporary file for previewing a document and returns its URL
     func createTemporaryFileForPreview(document: CarDocument) -> URL? {
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(document.fileName)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(document.fileName.pathExtension)
+        
         do {
             try document.documentData.write(to: tempURL)
             return tempURL
@@ -92,6 +94,12 @@ class DocumentManager: ObservableObject {
         }
         
         do {
+            // Get attributes to check file size
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let fileSize = attributes[.size] as? Int, fileSize > maxFileSize {
+                throw DocumentManagerError.fileTooLarge(fileSize)
+            }
+            
             // Read the document data
             let documentData = try Data(contentsOf: url)
             let fileName = url.lastPathComponent
@@ -120,5 +128,12 @@ class DocumentManager: ObservableObject {
             print("Error loading document: \(error)")
             throw DocumentManagerError.fileReadError
         }
+    }
+}
+
+// Extension to get file extension more safely
+extension String {
+    var pathExtension: String {
+        (self as NSString).pathExtension.lowercased()
     }
 }

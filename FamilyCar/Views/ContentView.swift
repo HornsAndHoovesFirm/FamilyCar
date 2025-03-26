@@ -4,6 +4,7 @@
 //
 //  Created by Oleg Chernobelsky on 12/03/2025.
 //  Updated for CloudKit integration on 17/03/2025.
+//  Updated to fix Family Member registration on 23/03/2025.
 //
 
 import SwiftUI
@@ -13,6 +14,7 @@ struct ContentView: View {
     @EnvironmentObject private var cloudKitManager: CloudKitManager
     @State private var selectedTab = 0
     @State private var showingSyncStatus = false
+    @State private var showDebugInfo = false
     
     var body: some View {
         Group {
@@ -51,7 +53,7 @@ struct ContentView: View {
                 }
                 .overlay(
                     // Show cloud sync status when active
-                    Group {
+                    VStack {
                         if showingSyncStatus {
                             VStack {
                                 Spacer()
@@ -67,6 +69,52 @@ struct ContentView: View {
                             }
                             .transition(.move(edge: .bottom))
                         }
+                        
+                        // Debug information overlay
+                        if showDebugInfo {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Debug Info:")
+                                    .font(.headline)
+                                
+                                Text("User ID: \(cloudKitManager.userID)")
+                                    .font(.caption)
+                                
+                                Text("User Name: \(cloudKitManager.userName)")
+                                    .font(.caption)
+                                
+                                Text("Family Members: \(cloudKitManager.familyMembers.count)")
+                                    .font(.caption)
+                                
+                                Text("Is Member: \(cloudKitManager.familyMembers.contains(where: { $0.deviceID == cloudKitManager.userID }) ? "Yes" : "No")")
+                                    .font(.caption)
+                                
+                                if !cloudKitManager.debugMessage.isEmpty {
+                                    Text("Status: \(cloudKitManager.debugMessage)")
+                                        .font(.caption)
+                                }
+                                
+                                Button("Add Self as Owner") {
+                                    cloudKitManager.addCurrentUserToFamily(role: "Owner")
+                                }
+                                .padding(.vertical, 5)
+                                
+                                Button("Refresh Members") {
+                                    cloudKitManager.fetchFamilyMembers()
+                                }
+                                .padding(.vertical, 5)
+                                
+                                Button("Hide Debug") {
+                                    showDebugInfo = false
+                                }
+                                .padding(.vertical, 5)
+                            }
+                            .padding()
+                            .background(Color.black.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
                     }
                     .animation(.easeInOut, value: showingSyncStatus)
                 )
@@ -76,12 +124,29 @@ struct ContentView: View {
                         cloudKitManager.addCurrentUserToFamily(role: "Owner")
                     }
                 }
+                .onTapGesture(count: 3) {
+                    // Triple tap anywhere to show debug info
+                    showDebugInfo = true
+                }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncStarted"))) { _ in
                     showingSyncStatus = true
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloudSyncCompleted"))) { _ in
                     withAnimation(.easeInOut(duration: 0.5)) {
                         showingSyncStatus = false
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("FamilyMemberAdded"))) { _ in
+                    // Show brief confirmation of member addition
+                    withAnimation {
+                        showingSyncStatus = true
+                    }
+                    
+                    // Hide after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            showingSyncStatus = false
+                        }
                     }
                 }
             }
@@ -94,6 +159,7 @@ struct SettingsView: View {
     @EnvironmentObject private var cloudKitManager: CloudKitManager
     @State private var showingSignOutAlert = false
     @State private var showingSyncAlert = false
+    @State private var showDebugInfo = false
     
     var body: some View {
         List {
@@ -154,11 +220,51 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                
+                // Add direct "Add me" button for emergency purposes
+                Button(action: {
+                    cloudKitManager.addCurrentUserToFamily(role: "Owner")
+                }) {
+                    Label("Register as Family Owner", systemImage: "person.badge.plus")
+                }
+                .foregroundColor(.blue)
             }
             
             Section(header: Text("About")) {
                 LabeledContent("App Version", value: "1.0.0")
                 LabeledContent("Database", value: "CloudKit")
+                
+                // Debug toggle
+                Button(action: {
+                    showDebugInfo.toggle()
+                }) {
+                    Label(showDebugInfo ? "Hide Debug Info" : "Show Debug Info",
+                          systemImage: showDebugInfo ? "bug.fill" : "bug")
+                }
+            }
+            
+            if showDebugInfo {
+                Section(header: Text("Debug Information")) {
+                    LabeledContent("User ID", value: cloudKitManager.userID)
+                    LabeledContent("User Name", value: cloudKitManager.userName)
+                    LabeledContent("Family Members", value: "\(cloudKitManager.familyMembers.count)")
+                    LabeledContent("Is Member", value: cloudKitManager.familyMembers.contains(where: { $0.deviceID == cloudKitManager.userID }) ? "Yes" : "No")
+                    
+                    if !cloudKitManager.debugMessage.isEmpty {
+                        Text("Status: \(cloudKitManager.debugMessage)")
+                            .font(.caption)
+                    }
+                    
+                    Button("Force Add as Owner") {
+                        cloudKitManager.addCurrentUserToFamily(role: "Owner")
+                    }
+                    .foregroundColor(.blue)
+                    
+                    Button("Refresh Member List") {
+                        cloudKitManager.fetchFamilyMembers()
+                    }
+                    .foregroundColor(.blue)
+                }
             }
         }
         .navigationTitle("Settings")
