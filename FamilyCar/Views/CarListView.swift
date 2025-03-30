@@ -10,7 +10,14 @@ import SwiftData
 
 struct CarListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \CarProfile.make) private var carProfiles: [CarProfile]
+    //@Query(sort: \CarProfile.make) private var carProfiles: [CarProfile]
+    @Query private var carProfiles: [CarProfile]
+
+    init() {
+        let sortDescriptor = SortDescriptor(\CarProfile.make)
+        _carProfiles = Query(sort: [sortDescriptor])
+    }
+    
     @State private var showingAddCar = false
     
     var body: some View {
